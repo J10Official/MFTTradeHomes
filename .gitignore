@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.spec
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Cache & output (generated artifacts — not source)
+.cache/
+
+# Synthetic test data (reproducible via generate_synthetic_data.py)
+allData_test/
+
+# Real NSE data — download separately (see README), too large for git
+allData/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+
+# Compiled coverage
+.coverage
+htmlcov/
+.pytest_cache/

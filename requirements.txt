@@ -1,0 +1,8 @@
+pandas>=2.0
+numpy>=1.24
+pyarrow>=14.0
+click>=8.1
+matplotlib>=3.7
+pytest>=7.0
+tqdm>=4.65
+pyyaml>=6.0
