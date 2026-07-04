@@ -30,9 +30,7 @@ The strategy is a **pure function of its inputs** — same `MarketContext` produ
 
 ---
 
-## What Sets This Apart
-
-Most assignment backtests are scripts. This is a framework. Below are the engineering decisions made deliberately to go beyond the brief.
+## Salient Features
 
 ### 1. Mathematically guaranteed no look-ahead bias
 All price lookups are centralized in a single function: `data/market_state.resample_to_seconds`. It uses `pd.merge_asof(direction='backward')` — for each canonical second T, only ticks with `timestamp ≤ T` can influence the price. There is no way to accidentally introduce look-ahead bias without explicitly bypassing this function. This is not a comment in the code; it is enforced by the data structure.
