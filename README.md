@@ -30,31 +30,6 @@ The strategy is a **pure function of its inputs** — same `MarketContext` produ
 
 ---
 
-## Salient Features
-
-### 1. Mathematically guaranteed no look-ahead bias
-All price lookups are centralized in a single function: `data/market_state.resample_to_seconds`. It uses `pd.merge_asof(direction='backward')` — for each canonical second T, only ticks with `timestamp ≤ T` can influence the price. There is no way to accidentally introduce look-ahead bias without explicitly bypassing this function. This is not a comment in the code; it is enforced by the data structure.
-
-### 2. 60× performance via numpy hot-loop engineering
-The 1-second cadence produces 23,400 loop iterations per trading day. Naively using `series.loc[ts]` (pandas O(log n) datetime index lookup) for every tick made the full run take 3–4 hours. We profiled the bottleneck, identified that all data is already aligned to a regular integer grid after resampling, and switched to pre-converting every `pd.Series` to a `np.ndarray` once per day — then using `arr[i]` throughout the hot loop. Result: **8 seconds per day** instead of 8 minutes. The full November 2022 run at 1s resolution now takes ~4 minutes.
-
-### 3. Memory-aware data loading (1.6 GB → 40 MB)
-Real NSE data has 100–600 option files per underlier per day. Loading everything would require ~1.6 GB of RAM and make a laptop run impractical. The loader computes the current ATM price from the futures file first, then loads only the **ATM ± 10 strike window** needed by the strategy (~44 files). The entire simulation runs in ~40 MB. The window is configurable, and disabling it (to load all strikes) is one env var.
-
-### 4. SHA-256 keyed parquet cache with checkpoint/resume
-Every parameter that affects output (timestep, costs, tie-break, date range, strategy) is hashed into a single cache key. Identical reruns are instant. If a run is interrupted mid-month (e.g. on 2 GB of real data), the checkpoint saves completed `(underlier, date)` pairs and trade records to parquet. On restart, already-processed days are skipped without recomputation. This is the difference between a script and a system.
-
-### 5. Pluggable strategy architecture
-Adding a new strategy requires one file and one method — `generate_signals(context: MarketContext) → List[Order]`. The engine, cache, analytics, CLI, and tuner all work with it automatically. The strategy receives only an immutable `MarketContext` snapshot: it cannot access raw data, the future, or the live portfolio object (only a read-only copy). This constraint is what makes the framework safe and the strategy testable in isolation.
-
-### 6. Hyperparameter tuner with overfitting detection
-The tuner (grid search and random search) splits the date range into train / test halves, runs each parameter combination on both, and raises an explicit overfitting flag when test PnL degrades by more than 50% relative to train. This is the standard protection against curve-fitting — a metric that is almost never implemented in academic backtests. Results include per-trial PnL, Sharpe, overfitting flag, and a recommended configuration (best test PnL, even if train is lower).
-
-### 7. Full analytics suite
-Six chart types are generated automatically after every run: cumulative PnL, daily PnL bars, a three-panel intraday sample (futures + ATM strike step, MTM PnL, roll markers), roll frequency histogram, ATM premium decay by time-of-day (theta visualization), and running drawdown. Alongside them: a per-second event log and per-trade execution log, both in parquet for efficient downstream analysis.
-
----
-
 ## Results — November 2022, Real NSE Tick Data
 
 Full-month backtest: NIFTY + BANKNIFTY, 1 November – 30 November 2022, **1-second timestep** (945,042 simulated ticks, zero transaction costs).
@@ -88,6 +63,31 @@ Full-month backtest: NIFTY + BANKNIFTY, 1 November – 30 November 2022, **1-sec
     <td><img src="results/drawdown_curve.png" width="100%" alt="Drawdown curve"/></td>
   </tr>
 </table>
+
+---
+
+## Salient Features
+
+### 1. Mathematically guaranteed no look-ahead bias
+All price lookups are centralized in a single function: `data/market_state.resample_to_seconds`. It uses `pd.merge_asof(direction='backward')` — for each canonical second T, only ticks with `timestamp ≤ T` can influence the price. There is no way to accidentally introduce look-ahead bias without explicitly bypassing this function. This is not a comment in the code; it is enforced by the data structure.
+
+### 2. 60× performance via numpy hot-loop engineering
+The 1-second cadence produces 23,400 loop iterations per trading day. Naively using `series.loc[ts]` (pandas O(log n) datetime index lookup) for every tick made the full run take 3–4 hours. We profiled the bottleneck, identified that all data is already aligned to a regular integer grid after resampling, and switched to pre-converting every `pd.Series` to a `np.ndarray` once per day — then using `arr[i]` throughout the hot loop. Result: **8 seconds per day** instead of 8 minutes. The full November 2022 run at 1s resolution now takes ~4 minutes.
+
+### 3. Memory-aware data loading (1.6 GB → 40 MB)
+Real NSE data has 100–600 option files per underlier per day. Loading everything would require ~1.6 GB of RAM and make a laptop run impractical. The loader computes the current ATM price from the futures file first, then loads only the **ATM ± 10 strike window** needed by the strategy (~44 files). The entire simulation runs in ~40 MB. The window is configurable, and disabling it (to load all strikes) is one env var.
+
+### 4. SHA-256 keyed parquet cache with checkpoint/resume
+Every parameter that affects output (timestep, costs, tie-break, date range, strategy) is hashed into a single cache key. Identical reruns are instant. If a run is interrupted mid-month (e.g. on 2 GB of real data), the checkpoint saves completed `(underlier, date)` pairs and trade records to parquet. On restart, already-processed days are skipped without recomputation. This is the difference between a script and a system.
+
+### 5. Pluggable strategy architecture
+Adding a new strategy requires one file and one method — `generate_signals(context: MarketContext) → List[Order]`. The engine, cache, analytics, CLI, and tuner all work with it automatically. The strategy receives only an immutable `MarketContext` snapshot: it cannot access raw data, the future, or the live portfolio object (only a read-only copy). This constraint is what makes the framework safe and the strategy testable in isolation.
+
+### 6. Hyperparameter tuner with overfitting detection
+The tuner (grid search and random search) splits the date range into train / test halves, runs each parameter combination on both, and raises an explicit overfitting flag when test PnL degrades by more than 50% relative to train. This is the standard protection against curve-fitting — a metric that is almost never implemented in academic backtests. Results include per-trial PnL, Sharpe, overfitting flag, and a recommended configuration (best test PnL, even if train is lower).
+
+### 7. Full analytics suite
+Six chart types are generated automatically after every run: cumulative PnL, daily PnL bars, a three-panel intraday sample (futures + ATM strike step, MTM PnL, roll markers), roll frequency histogram, ATM premium decay by time-of-day (theta visualization), and running drawdown. Alongside them: a per-second event log and per-trade execution log, both in parquet for efficient downstream analysis.
 
 ---
 
