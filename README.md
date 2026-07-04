@@ -11,18 +11,18 @@ A production-grade, strategy-agnostic backtesting framework for NSE index option
             ┌──────────────────┼──────────────────┐
             ▼                  ▼                  ▼
       ┌──────────┐       ┌──────────┐       ┌──────────┐
-      │ strategies│       │  engine  │       │ analytics│
+      │strategies│       │  engine  │       │ analytics│
       │  base.py │       │ backtest │       │ metrics  │
-      │atm_strad.│──ctx──▶│ portfolio│──logs▶│  plots   │
+      │atm_strad.│─ctx─▶│ portfolio│──logs▶│  plots   │
       └────┬─────┘       │  cache   │       └──────────┘
            │             └────┬─────┘
            │                  │
            ▼                  ▼
-      ┌──────────┐       ┌──────────┐
+      ┌──────────┐       ┌───────────┐
       │   data   │       │instruments│
       │ parser   │       │ option    │
       │ loader   │       │ future    │
-      │market_st.│       └──────────┘
+      │market_st.│       └───────────┘
       └──────────┘
 ```
 
